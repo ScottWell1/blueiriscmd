@@ -2,15 +2,16 @@
 # -*- coding: utf-8 -*-
 
 #
-# Magnus Appelquist 2014-06-02 Initial
+# Original concept by: Magnus Appelquist 2014-06-02
+# Forked 2021-12-30 Scott W
+# - Update for python3
+# - add camera enable/disable functions
 #
 
 import requests, json, hashlib, sys, argparse
 
 def main():
     parser = argparse.ArgumentParser(description='Blue Iris controller', prog='blueiris')
-
-    parser.add_argument('--version', action='version', version='%(prog)s 1.0 https://github.com/magapp/blueiris')
     parser.add_argument("--host", help="Blue Iris host to connect to ", required=True)
     parser.add_argument('--user', help='User to use when connecting', required=True)
     parser.add_argument('--password', help='Password to use when connecting', required=True)
@@ -22,42 +23,56 @@ def main():
     parser.add_argument('--trigger', action='store', help='Trigger camera', metavar='camera-short-name', default=None)
     parser.add_argument('--ptzbutton', action='store', help='Send PTZ Button Number', metavar='ptz-button-name', default=None)
     parser.add_argument('--ptzcam', action='store', help='Send PTZ Command', metavar='ptz-cam-name', default=None)
+    parser.add_argument('--enable', action='store', help='Enable named camera', metavar='camera-short-name', default=None)	
+    parser.add_argument('--disable', action='store', help='Disable named camera', metavar='camera-short-name', default=None)
 
-    args = parser.parse_args()
+    myargs = parser.parse_args()
+	
+    bi = BlueIris(myargs.host, myargs.user, myargs.password, myargs.debug)
+    print(f"Profile {bi.get_profile()} is active.") 
+    print(f"Schedule {bi.get_schedule()}")
+    print(f"Signal is {bi.get_signal()}")
 
-    bi = BlueIris(args.host, args.user, args.password, args.debug)
-    print "Profile '%s' is active" % bi.get_profile()
-    print "Schedule '%s' is active" % bi.get_schedule()
-    print "Signal is %s" % bi.get_signal()
+    if myargs.list_profiles:
+        print("Available profiles are:")
+        print(", ".join(bi.profiles_list))
 
-    if args.list_profiles:
-        print "Available profiles are:"
-        print ", ".join(bi.profiles_list)
-
-    if args.set_profile:
+    if myargs.set_profile:
         try:
-            profile_id = bi.profiles_list.index(args.set_profile)
+            profile_id = bi.profiles_list.index(myargs.set_profile)
         except:
-            print "Could not find any profile with that name. Use --list-profiles to see available profiles."
+            print("Could not find any profile with that name. Use --list-profiles to see available profiles.")
             sys.exit(0)
-        print "Setting active profile to '%s' (id: %d)" % (args.set_profile, profile_id)
+        #print "Setting active profile to '%s' (id: %d)" % (myargs.set_profile, profile_id)
+        print(f"Setting active profile to {myargs.set_profile} (id: {profile_id}")
         bi.cmd("status", {"profile": profile_id})
 
-    if args.set_signal:
+    if myargs.set_signal:
         signal = bi.get_signal()
-        print "Switching signal %s -> %s" % (signal, args.set_signal)
-        bi.set_signal(args.set_signal)
+        #print "Switching signal %s -> %s" % (signal, myargs.set_signal)
+        print(f"Switching signal {signal} -> {myargs.set_signal}")
+        bi.set_signal(myargs.set_signal)
 
-    if args.set_schedule:
+    if myargs.set_schedule:
         schedule = bi.get_schedule()
-        print "Switching schedule %s -> %s" % (schedule, args.set_schedule)
-        bi.set_schedule(args.set_schedule)
+        #print "Switching schedule %s -> %s" % (schedule, myargs.set_schedule)
+        print(f"Switching schedule {schedule} -> {myargs.set_schedule}")
+        bi.set_schedule(myargs.set_schedule)
 
-    if args.trigger:
-        print "Triggering camera '%s'" % args.trigger
-        bi.cmd("trigger", {"camera": args.trigger})
+    if myargs.trigger:
+        #print "Triggering camera '%s'" % myargs.trigger
+        print(f"Triggering camera {myargs.trigger}")
+        bi.cmd("trigger", {"camera": myargs.trigger})
         
-    if args.ptzbutton:
+    if myargs.disable:
+        print(f'Disabling camera {myargs.disable}')
+        bi.cmd("camconfig", {"camera":myargs.disable,"enable":False})
+		
+    if myargs.enable:
+        print(f'Enabling camera {myargs.enable}')
+        bi.cmd("camconfig", {"camera":myargs.enable,"enable":True})
+		
+    if myargs.ptzbutton:
         #0: Pan left
         #1: Pan right
         #2: Tilt up
@@ -70,11 +85,12 @@ def main():
         #27..33: Contrast 0-6
         #34..35: IR on, off
         #101..120: Go to preset position 1..20
-        if not args.ptzcam:
-            print "Using --ptzcmdnum requires argument --ptzcam with valid Cam Name.."
+        if not myargs.ptzcam:
+            print("Using --ptzcmdnum requires argument --ptzcam with valid Cam Name..")
             sys.exit(0)
-        print "Sending PTZ Command Button:" + args.ptzbutton + " to Cam: " + args.ptzcam
-        bi.cmd("ptz", {"camera": args.ptzcam,"button": int(args.ptzbutton),"updown": 0})
+        #print "Sending PTZ Command Button:" + myargs.ptzbutton + " to Cam: " + myargs.ptzcam
+        print(f"Sending PTZ Command Button: {myargs.ptzbutton} to Cam: {myargs.ptzcam}")		
+        bi.cmd("ptz", {"camera": myargs.ptzcam,"button": int(myargs.ptzbutton),"updown": 0})
 
     bi.logout()
     sys.exit(0)
@@ -92,37 +108,38 @@ class BlueIris:
         self.url = "http://"+host+"/json"
         r = requests.post(self.url, data=json.dumps({"cmd":"login"}))
         if r.status_code != 200:
-            print r.status_code
-            print r.text
+            print(r.status_code)
+            print(r.text)
             sys.exit(1)
 
         self.session = r.json()["session"]
-        self.response = hashlib.md5("%s:%s:%s" % (user, self.session, password)).hexdigest()
+        #self.response = hashlib.md5("%s:%s:%s" % (user, self.session, password)).hexdigest()
+        self.response = hashlib.md5(str(f"{user}:{self.session}:{password}").encode('utf-8')).hexdigest()
         if self.debug:
-            print "session: %s response: %s" % (self.session, self.response)
+            print(f"session: {self.session} response {self.response}")
 
         r = requests.post(self.url, data=json.dumps({"cmd":"login", "session": self.session, "response": self.response}))
         if r.status_code != 200 or r.json()["result"] != "success":
-            print r.status_code
-            print r.text
+            print(r.status_code)
+            print(r.text)
             sys.exit(1)
         self.system_name = r.json()["data"]["system name"]
         self.profiles_list = r.json()["data"]["profiles"]
 
-        print "Connected to '%s'" % self.system_name
+        print(f"Connected to {self.system_name}")
 
     def cmd(self, cmd, params=dict()):
-        args = {"session": self.session, "cmd": cmd}
-        args.update(params)
+        myargs = {"session": self.session, "cmd": cmd}
+        myargs.update(params)
 
         # print self.url
         # print "Sending Data: "
         # print json.dumps(args)
-        r = requests.post(self.url, data=json.dumps(args))
+        r = requests.post(self.url, data=json.dumps(myargs))
 
         if r.status_code != 200:
-            print r.status_code
-            print r.text
+            print(r.status_code)
+            print(r.text)
             sys.exit(1)
         else:
             pass
@@ -130,7 +147,7 @@ class BlueIris:
             #print r.text
 
         if self.debug:
-            print str(r.json())
+            print(str(r.json()))
 
         try:
             return r.json()["data"]
