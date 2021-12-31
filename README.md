@@ -1,27 +1,32 @@
 blueiriscmd
 ===========
 
-Python cmd tool that talk with Blue Iris Camera surveillance software API.
+Python cmd tool to communicate with BlueIris Camera surveillance software API.
 
-Blue Iris have an API that allows other programs to read status, trigger events, change profile, set signal, schedule and such. This python tool gives you a command line tool that can be used.
+Blue Iris has a json API that allows reading status, triggering events, changing profiles, enabling/disabling cameras, and so forth. This python tool provides a command line utility to interact with BlueIris using it's json API.
 
 Example to change current profile to "Home":
 
-    blueiris.py --host 192.168.1.100 --user username --password password  --set-profile Home
+    blueiris.py --host 192.168.1.100:17001 --user username --password password  --set-profile Home
     Connected to 'My place'
     Profile 'Away' is active
     Setting active profile to 'Home' (id: 2)
 
 This command will trigger event on camera "garage":
 
-    blueiris.py --host 192.168.1.100 --user username --password password --trigger garage
+    blueiris.py --host 192.168.1.100:17001 --user username --password password --trigger garage
     Connected to 'My place'
     Profile 'Borta' is active
     Triggering camera 'garage'
 
-I use this to change profile from my home alarm system automaticlly, and also to trigger cameras from PIR connected to a Raspberry Pi.
+This command will set a camera's state to "enabled":
 
-Full API is not implemented, but feel free to add what you miss.
+    blueiris.py --host 192.168.1.100:17001 --user username --password password --enable garage
+    Connected to 'My place'
+    Profile 'Borta' is active
+    Enabling camera 'garage'
+
+Full API is not yet implemented, but feel free to add what you need.
 
 More information regarding Blue Iris can be found here:
 http://blueirissoftware.com/
